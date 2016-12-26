@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:int="http://www.springframework.org/schema/integration"
+       xmlns:int-kafka="http://www.springframework.org/schema/integration/kafka"
+       xmlns:task="http://www.springframework.org/schema/task"
+       xsi:schemaLocation="http://www.springframework.org/schema/integration/kafka
+                        http://www.springframework.org/schema/integration/kafka/spring-integration-kafka.xsd
+                        http://www.springframework.org/schema/integration 
+                        http://www.springframework.org/schema/integration/spring-integration.xsd
+                        http://www.springframework.org/schema/beans 
+                        http://www.springframework.org/schema/beans/spring-beans.xsd
+                        http://www.springframework.org/schema/task 
+                        http://www.springframework.org/schema/task/spring-task.xsd">
+
+
+    <int:channel id="sfInputFromKafka">
+        <int:dispatcher task-executor="sfKafkaMessageExecutor" />
+    </int:channel>
+
+    <int-kafka:message-driven-channel-adapter
+            id="sfKafkaListener" listener-container="sfRegisterContainer" auto-startup="true"
+            phase="100" send-timeout="5000" channel="sfInputFromKafka"
+            error-channel="errorChannel" />
+
+    <task:executor id="sfKafkaMessageExecutor" pool-size="8"
+                   keep-alive="120" queue-capacity="500" />
+
+    <bean id="sfRegisterContainer"
+          class="org.springframework.kafka.listener.KafkaMessageListenerContainer">
+        <constructor-arg>
+            <bean class="org.springframework.kafka.core.DefaultKafkaConsumerFactory">
+                <constructor-arg>
+                    <map>
+                        <entry key="bootstrap.servers" value="${broker.address}" />
+                        <entry key="group.id" value="sfgroup"></entry>
+                        <entry key="enable.auto.commit" value="true"></entry>
+                        <entry key="auto.commit.interval.ms" value="1000"></entry>
+                        <entry key="session.timeout.ms" value="15000"></entry>
+                        <entry key="key.deserializer"
+                               value="${key.deserializer}"></entry>
+                        <entry key="value.deserializer"
+                               value="${value.deserializer}"></entry>
+                    </map>
+                </constructor-arg>
+            </bean>
+        </constructor-arg>
+        <constructor-arg name="containerProperties" ref="sfContainerProperties"/>
+    </bean>
+
+    <bean id="sfContainerProperties"
+          class="org.springframework.kafka.listener.config.ContainerProperties">
+        <constructor-arg name="topics">
+            <array>
+                <value>registerMessageTopic</value>
+            </array>
+        </constructor-arg>
+    </bean>
+
+
+    <bean id="sfConsumer" class="com.zpq.service.impl.SfConsumerServiceImpl" >
+        <property name="userDao" ref="sfUserDao"/>
+    </bean>
+
+    <int:outbound-channel-adapter channel="sfInputFromKafka"
+                                  ref="sfConsumer" method="processMessage" />
+
+
+
+</beans>

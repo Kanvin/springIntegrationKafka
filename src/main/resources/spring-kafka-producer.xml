@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:int="http://www.springframework.org/schema/integration"
+       xmlns:int-kafka="http://www.springframework.org/schema/integration/kafka"
+       xmlns:task="http://www.springframework.org/schema/task"
+       xsi:schemaLocation="http://www.springframework.org/schema/integration/kafka http://www.springframework.org/schema/integration/kafka/spring-integration-kafka-2.0.xsd
+        http://www.springframework.org/schema/integration http://www.springframework.org/schema/integration/spring-integration-4.2.xsd
+        http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.1.xsd
+        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.1.xsd">
+
+    <context:property-placeholder location="classpath:kafkaServers.properties" />
+
+    <int:channel id="inputToKafka">
+        <int:dispatcher task-executor="taskExecutor"/>
+
+    </int:channel>
+
+    <!-- listens to the RegisterProducerServiceImpl and acts based on the result -->
+    <bean id="producerListener" class="com.zpq.listener.RegisterProducerListener" />
+
+    <int-kafka:outbound-channel-adapter
+            auto-startup="true"
+            kafka-template="kafkaTemplate"
+            channel="inputToKafka" />
+
+    <task:executor id="taskExecutor" pool-size="5"
+                   keep-alive="120" queue-capacity="500" />
+
+    <bean id="kafkaTemplate" class="org.springframework.kafka.core.KafkaTemplate">
+        <constructor-arg index="0" ref="producerFactory"></constructor-arg>
+        <property name="producerListener" ref="producerListener" />
+    </bean>
+
+    <bean id="producerFactory" class="org.springframework.kafka.core.DefaultKafkaProducerFactory">
+        <constructor-arg>
+            <map>
+                <entry key="bootstrap.servers" value="${broker.address}"/>
+                <entry key="group.id" value="${group.id}" />
+                <entry key="retries" value="${retries}" />
+                <entry key="batch.size" value="${batch.size}" />
+                <entry key="linger.ms" value="${linger.ms}" />
+                <entry key="buffer.memory" value="${buffer.memory}" />
+                <entry key="key.serializer" value="${key.serializer}" />
+                <entry key="value.serializer" value="${value.serializer}" />
+            </map>
+        </constructor-arg>
+    </bean>
+</beans>
